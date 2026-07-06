@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Google Drive Shorts - Professional No-Mix TikTok Style App</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --card-bg: #121212;
+            --primary-color: #fe2c55;
+            --text-color: #ffffff;
+            --text-secondary: #aaaaaa;
+            --border-color: #2f2f2f;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        /* 透過ナビゲーションバー */
+        .navbar {
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0));
+            display: flex;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+        }
+        .nav-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 16px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+        .nav-btn:hover {
+            color: var(--text-color);
+        }
+        .nav-btn.active {
+            color: var(--text-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        /* ページ制御 */
+        .page {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .page.active {
+            display: block;
+        }
+
+        /* TikTokライク視聴フィード */
+        .feed-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .feed-container::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .feed-item {
+            width: 100%;
+            height: 100%;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            position: relative;
+            background-color: #000;
+        }
+        
+        /* 【高画質ハック】プレイヤー表示領域を100%（全幅）に拡大 */
+        /* Google側の自動画質選択アルゴリズムに対し、最大の表示領域であることを認識させて最高画質を誘発します */
+        .video-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .video-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            /* 縦横比を維持しつつ画面いっぱいに広げる設定 */
+            object-fit: cover; 
+        }
+        
+        /* TikTok風オーバーレイ */
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 40px 20px 60px 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: none;
+            z-index: 10;
+        }
+        .video-overlay-content {
+            pointer-events: auto;
+            max-width: 85%;
+        }
+        .video-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+        }
+        .video-desc {
+            font-size: 12px;
+            color: #d1d1d1;
+            font-family: monospace;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+        }
+
+        /* 管理・編集ページ */
+        #adminPage {
+            overflow-y: auto;
+            padding: 80px 20px 40px 20px;
+            background-color: #121212;
+        }
+        .admin-layout {
+            max-width: 700px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+        h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 15px;
+            background-color: #1e1e1e;
+            color: var(--text-color);
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+        button.btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        
+        .video-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        .video-table th, .video-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .video-table th {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        .video-table td {
+            font-size: 14px;
+        }
+        .btn-danger {
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .empty-message {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 30px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <button class="nav-btn active" onclick="switchPage('feedPage', this)">🔥 フィード</button>
+        <button class="nav-btn" onclick="switchPage('adminPage', this)">🛠️ 管理・編集</button>
+    </nav>
+
+    <div id="feedPage" class="page active">
+        <div class="feed-container" id="feedContainer">
+            <!-- JSにより動的生成 -->
+        </div>
+    </div>
+
+    <div id="adminPage" class="page">
+        <div class="admin-layout">
+            <div class="card">
+                <h2>🎬 新規ショート動画登録</h2>
+                <div class="input-group">
+                    <label>動画タイトル</label>
+                    <input type="text" id="newTitle" placeholder="例: デモ動画クリップ A">
+                </div>
+                <div class="input-group">
+                    <label>Google Drive 共有リンク / プレビューURL</label>
+                    <input type="text" id="newUrl" placeholder="https://drive.google.com/file/d/.../view">
+                </div>
+                <button class="btn-primary" onclick="addVideo()">動画をシステムに追加</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 プレイリスト一覧 (<span id="videoCount">0</span>)</h2>
+                <div style="overflow-x: auto;">
+                    <table class="video-table">
+                        <thead>
+                            <tr>
+                                <th>タイトル</th>
+                                <th>ID</th>
+                                <th style="width: 70px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody">
+                            <!-- JS動的生成 -->
+                        </tbody>
+                    </table>
+                    <div id="emptyMessage" class="empty-message">動画がありません。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // データのローカル永続化[cite: 2]
+    let videoList = JSON.parse(localStorage.getItem('tiktok_gdrive_videos')) || [
+        { id: "demo1", title: "【初期デモ】動画1 - 複数同時登録テスト用", fileId: "16qfu3F_59br665lLoMwt1Wr5H9xY4Jfm" }
+    ];
+
+    let currentLoadedIndex = 0;
+    let activeObserver = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderAdminList();
+        initFeed();
+    });
+
+    function switchPage(pageId, btnElement) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById(pageId).classList.add('active');
+        btnElement.classList.add('active');
+
+        if (pageId === 'feedPage') {
+            initFeed();
+        } else {
+            document.getElementById('feedContainer').innerHTML = ''; // リソースの完全解放[cite: 2]
+        }
+    }
+
+    function extractFileId(url) {
+        const patterns = [
+            /\/file\/d\/([a-zA-Z0-9_-]{28,40})/,
+            /id=([a-zA-Z0-9_-]{28,40})/,
+            /\/d\/([a-zA-Z0-9_-]{28,40})/
+        ];
+        for (let pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) return match[1];
+        }
+        return null;
+    }
+
+    function addVideo() {
+        const titleInput = document.getElementById('newTitle');
+        const urlInput = document.getElementById('newUrl');
+        const title = titleInput.value.trim() || `Shorts Video #${videoList.length + 1}`;
+        const fileId = extractFileId(urlInput.value.trim());
+
+        if (!urlInput.value.trim() || !fileId) {
+            alert('有効なGoogle DriveのURLを入力してください。');
+            return;
+        }
+
+        videoList.push({ id: 'vid_' + Date.now(), title: title, fileId: fileId });
+        localStorage.setItem('tiktok_gdrive_videos', JSON.stringify(videoList));
+        renderAdminList();
+
+        titleInput.value = '';
+        urlInput.value = '';
+        alert('動画を追加しました。');
+    }
+
+    function deleteVideo(id) {
+        if (confirm('この動画を削除しますか？')) {
+            videoList = videoList.filter(v => v.id !== id);
+            localStorage.setItem('tiktok_gdrive_videos', JSON.stringify(videoList));
+            renderAdminList();
+        }
+    }
+
+    function renderAdminList() {
+        const tbody = document.getElementById('adminTableBody');
+        const emptyMsg = document.getElementById('emptyMessage');
+        document.getElementById('videoCount').textContent = videoList.length;
+
+        tbody.innerHTML = '';
+        if (videoList.length === 0) {
+            emptyMsg.style.display = 'block';
+            return;
+        }
+        emptyMsg.style.display = 'none';
+
+        videoList.forEach(video => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${escapeHtml(video.title)}</strong></td>
+                <td style="font-family: monospace; color: var(--text-secondary); font-size:12px;">${video.fileId}</td>
+                <td><button class="btn-danger" onclick="deleteVideo('${video.id}')">削除</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // フィードの完全初期化
+    function initFeed() {
+        const container = document.getElementById('feedContainer');
+        container.innerHTML = '';
+        currentLoadedIndex = 0;
+        
+        if (videoList.length === 0) {
+            container.innerHTML = '<div class="empty-message" style="padding-top:150px;">動画がありません。</div>';
+            return;
+        }
+
+        for (let i = 0; i < Math.max(10, videoList.length * 2); i++) {
+            appendFeedItem();
+        }
+
+        setupRobustTikTokObserver();
+    }
+
+    function appendFeedItem() {
+        const container = document.getElementById('feedContainer');
+        if (videoList.length === 0) return;
+
+        const videoItem = videoList[currentLoadedIndex % videoList.length];
+        currentLoadedIndex++;
+
+        const feedItem = document.createElement('div');
+        feedItem.className = 'feed-item';
+        feedItem.dataset.fileId = videoItem.fileId;
+        
+        feedItem.innerHTML = `
+            <div class="video-wrapper"></div>
+            <div class="video-overlay">
+                <div class="video-overlay-content">
+                    <div class="video-title">@User_Stream • ${escapeHtml(videoItem.title)}</div>
+                    <div class="video-desc">File ID: ${videoItem.fileId}</div>
+                </div>
+            </div>
+        `;
+        container.appendChild(feedItem);
+    }
+
+    // 複数動画に完全対応した高堅牢な監視システム
+    function setupRobustTikTokObserver() {
+        const container = document.getElementById('feedContainer');
+        if (activeObserver) activeObserver.disconnect();
+
+        const options = {
+            root: container,
+            threshold: [0.05, 0.60]
+        };
+
+        activeObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const targetItem = entry.target;
+                const wrapper = targetItem.querySelector('.video-wrapper');
+                const fileId = targetItem.dataset.fileId;
+                
+                const allItems = Array.from(container.querySelectorAll('.feed-item'));
+                const currentIndex = allItems.indexOf(targetItem);
+
+                // 【インライン再生の最適化】小さくスタートするのを防止しインラインで強制最大展開
+                // playsinline=1 とあわせて、自動再生時に最高品質が選択されやすくなるURL構成にしています
+                const baseParams = `autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+                const embedUrlMuted = `https://drive.google.com/file/d/${fileId}/preview?${baseParams}&mute=1`;
+                const embedUrlActive = `https://drive.google.com/file/d/${fileId}/preview?${baseParams}&mute=0`;
+
+                // 1. メイン表示領域（60%以上露出）に到達した場合
+                if (entry.intersectionRatio >= 0.60) {
+                    let iframe = wrapper.querySelector('iframe');
+                    if (!iframe) {
+                        wrapper.innerHTML = `<iframe src="${embedUrlActive}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+                    } else if (!iframe.src.includes('mute=0')) {
+                        iframe.src = embedUrlActive;
+                    }
+
+                    // 無限追記判定の最適化
+                    if (currentIndex >= allItems.length - 4) {
+                        appendFeedItem();
+                        appendFeedItem();
+                        appendFeedItem();
+                        updateObserverElements();
+                    }
+                } 
+                // 2. 次の動画候補（スワイプ途中で5%〜60%未満露出）に到達した場合
+                else if (entry.intersectionRatio >= 0.05 && entry.intersectionRatio < 0.60) {
+                    let iframe = wrapper.querySelector('iframe');
+                    if (!iframe) {
+                        wrapper.innerHTML = `<iframe src="${embedUrlMuted}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+                    }
+                } 
+                // 3. 完全画面外
+                else {
+                    wrapper.innerHTML = ''; // 音混ざりの要因を完全に物理破壊[cite: 2]
+                }
+            });
+        }, options);
+
+        updateObserverElements();
+    }
+
+    function updateObserverElements() {
+        const container = document.getElementById('feedContainer');
+        container.querySelectorAll('.feed-item').forEach(item => {
+            activeObserver.observe(item);
+        });
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, function(match) {
+            const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+            return escapeMap[match];
+        });
+    }
+</script>
+</body>
+</html>
