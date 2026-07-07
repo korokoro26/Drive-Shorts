@@ -27,7 +27,7 @@
             overflow: hidden;
         }
         
-        /* 透過ナビゲーションバー */
+        /* 透過ナビゲーションバー：常に最前面に表示し、動画視聴を邪魔しない薄いデザイン */
         .navbar {
             background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0));
             display: flex;
@@ -37,7 +37,9 @@
             left: 0;
             width: 100%;
             z-index: 100;
+            pointer-events: auto;
         }
+
         .nav-btn {
             background: none;
             border: none;
@@ -89,8 +91,7 @@
             background-color: #000;
         }
         
-        /* 【高画質ハック】プレイヤー表示領域を100%（全幅）に拡大 */
-        /* Google側の自動画質選択アルゴリズムに対し、最大の表示領域であることを認識させて最高画質を誘発します */
+        /* プレイヤー表示領域を100%（全幅）に拡大 */
         .video-wrapper {
             width: 100%;
             height: 100%;
@@ -99,40 +100,15 @@
             justify-content: center;
             align-items: center;
         }
+        
+        /* 不要なコントロール操作（再生停止、シーク、設定等）を無効化するハック */
         .video-wrapper iframe {
             width: 100%;
             height: 100%;
             border: none;
-            /* 縦横比を維持しつつ画面いっぱいに広げる設定 */
             object-fit: cover; 
-        }
-        
-        /* TikTok風オーバーレイ */
-        .video-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 40px 20px 60px 20px;
-            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
-            pointer-events: none;
-            z-index: 10;
-        }
-        .video-overlay-content {
-            pointer-events: auto;
-            max-width: 85%;
-        }
-        .video-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-        }
-        .video-desc {
-            font-size: 12px;
-            color: #d1d1d1;
-            font-family: monospace;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+            /* クリックやタップイベントをすり抜けさせ、シークバー等の操作をカット */
+            pointer-events: none; 
         }
 
         /* 管理・編集ページ */
@@ -230,15 +206,14 @@
 </head>
 <body>
 
-    <nav class="navbar">
-        <button class="nav-btn active" onclick="switchPage('feedPage', this)">🔥 フィード</button>
-        <button class="nav-btn" onclick="switchPage('adminPage', this)">🛠️ 管理・編集</button>
+    <nav class="navbar" id="mainNavbar">
+        <button class="nav-btn active" id="btn-feedPage" onclick="switchPage('feedPage')">🔥 フィード</button>
+        <button class="nav-btn" id="btn-adminPage" onclick="switchPage('adminPage')">🛠️ 管理・編集</button>
     </nav>
 
     <div id="feedPage" class="page active">
         <div class="feed-container" id="feedContainer">
-            <!-- JSにより動的生成 -->
-        </div>
+            </div>
     </div>
 
     <div id="adminPage" class="page">
@@ -246,7 +221,7 @@
             <div class="card">
                 <h2>🎬 新規ショート動画登録</h2>
                 <div class="input-group">
-                    <label>動画タイトル</label>
+                    <label>動画タイトル（管理用）</label>
                     <input type="text" id="newTitle" placeholder="例: デモ動画クリップ A">
                 </div>
                 <div class="input-group">
@@ -268,8 +243,7 @@
                             </tr>
                         </thead>
                         <tbody id="adminTableBody">
-                            <!-- JS動的生成 -->
-                        </tbody>
+                            </tbody>
                     </table>
                     <div id="emptyMessage" class="empty-message">動画がありません。</div>
                 </div>
@@ -278,30 +252,73 @@
     </div>
 
 <script>
-    // データのローカル永続化[cite: 2]
+    // データのローカル永続化
     let videoList = JSON.parse(localStorage.getItem('tiktok_gdrive_videos')) || [
         { id: "demo1", title: "【初期デモ】動画1 - 複数同時登録テスト用", fileId: "16qfu3F_59br665lLoMwt1Wr5H9xY4Jfm" }
     ];
 
     let currentLoadedIndex = 0;
     let activeObserver = null;
+    let currentPageId = 'feedPage';
+
+    // スワイプ検知用の変数
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
         renderAdminList();
         initFeed();
+        setupSwipeNavigation();
     });
 
-    function switchPage(pageId, btnElement) {
+    // ページ切り替え（引数を簡素化）
+    function switchPage(pageId) {
+        if (currentPageId === pageId) return;
+
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         
         document.getElementById(pageId).classList.add('active');
-        btnElement.classList.add('active');
+        document.getElementById(`btn-${pageId}`).classList.add('active');
+
+        currentPageId = pageId;
 
         if (pageId === 'feedPage') {
             initFeed();
         } else {
-            document.getElementById('feedContainer').innerHTML = ''; // リソースの完全解放[cite: 2]
+            document.getElementById('feedContainer').innerHTML = ''; // リソースの完全解放
+        }
+    }
+
+    // 左右スライド（スワイプ）でタブを切り替える機構
+    function setupSwipeNavigation() {
+        window.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            handleSwipeGesture();
+        }, { passive: true });
+    }
+
+    function handleSwipeGesture() {
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY;
+
+        // 縦方向のスクロール（動画スワイプなど）を邪魔しないよう、横スワイプの判定度合いを厳しめに設定
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 70) {
+            if (diffX > 0) {
+                // 右スワイプ（左から右へのスライド） -> フィード画面へ
+                switchPage('feedPage');
+            } else {
+                // 左スワイプ（右から左へのスライド） -> 管理画面へ
+                switchPage('adminPage');
+            }
         }
     }
 
@@ -398,19 +415,10 @@
         feedItem.className = 'feed-item';
         feedItem.dataset.fileId = videoItem.fileId;
         
-        feedItem.innerHTML = `
-            <div class="video-wrapper"></div>
-            <div class="video-overlay">
-                <div class="video-overlay-content">
-                    <div class="video-title">@User_Stream • ${escapeHtml(videoItem.title)}</div>
-                    <div class="video-desc">File ID: ${videoItem.fileId}</div>
-                </div>
-            </div>
-        `;
+        feedItem.innerHTML = `<div class="video-wrapper"></div>`;
         container.appendChild(feedItem);
     }
 
-    // 複数動画に完全対応した高堅牢な監視システム
     function setupRobustTikTokObserver() {
         const container = document.getElementById('feedContainer');
         if (activeObserver) activeObserver.disconnect();
@@ -429,13 +437,10 @@
                 const allItems = Array.from(container.querySelectorAll('.feed-item'));
                 const currentIndex = allItems.indexOf(targetItem);
 
-                // 【インライン再生の最適化】小さくスタートするのを防止しインラインで強制最大展開
-                // playsinline=1 とあわせて、自動再生時に最高品質が選択されやすくなるURL構成にしています
-                const baseParams = `autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+                const baseParams = `autoplay=1&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0`;
                 const embedUrlMuted = `https://drive.google.com/file/d/${fileId}/preview?${baseParams}&mute=1`;
                 const embedUrlActive = `https://drive.google.com/file/d/${fileId}/preview?${baseParams}&mute=0`;
 
-                // 1. メイン表示領域（60%以上露出）に到達した場合
                 if (entry.intersectionRatio >= 0.60) {
                     let iframe = wrapper.querySelector('iframe');
                     if (!iframe) {
@@ -444,7 +449,6 @@
                         iframe.src = embedUrlActive;
                     }
 
-                    // 無限追記判定の最適化
                     if (currentIndex >= allItems.length - 4) {
                         appendFeedItem();
                         appendFeedItem();
@@ -452,16 +456,14 @@
                         updateObserverElements();
                     }
                 } 
-                // 2. 次の動画候補（スワイプ途中で5%〜60%未満露出）に到達した場合
                 else if (entry.intersectionRatio >= 0.05 && entry.intersectionRatio < 0.60) {
                     let iframe = wrapper.querySelector('iframe');
                     if (!iframe) {
                         wrapper.innerHTML = `<iframe src="${embedUrlMuted}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
                     }
                 } 
-                // 3. 完全画面外
                 else {
-                    wrapper.innerHTML = ''; // 音混ざりの要因を完全に物理破壊[cite: 2]
+                    wrapper.innerHTML = '';
                 }
             });
         }, options);
